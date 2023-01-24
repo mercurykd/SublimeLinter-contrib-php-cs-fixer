@@ -12,6 +12,8 @@
 
 import logging
 import os
+import re
+import json
 
 from SublimeLinter.lint import Linter, util
 
@@ -50,11 +52,7 @@ class PhpCsFixer(Linter):
     defaults = {
         'selector': 'embedding.php, source.php  - text.blade'
     }
-    regex = (
-        r'^\s+\d+\)\s+.+\s+\((?P<message>.+)\)[^\@]*'
-        r'\@\@\s+\-\d+,\d+\s+\+(?P<line>\d+),\d+\s+\@\@'
-        r'[^-+]+[-+]?\s+(?P<error>[^\n]*)'
-    )
+    regex = r'@@.+?-(?P<line>\d+)'
     multiline = True
     tempfile_suffix = 'php'
     error_stream = util.STREAM_STDOUT
@@ -62,9 +60,22 @@ class PhpCsFixer(Linter):
     def split_match(self, match):
         """Extract and return values from match."""
         match, line, col, error, warning, message, near = super().split_match(match)
-
-        line = line + 3
-        message = "php-cs-fixer error(s) - " + message
+        if match.string:
+            j = json.loads(match.string)
+            diff = re.split(r'@@.+?-(\d+).+?@@', j['files'][0]['diff'])[1:]
+            errors = {}
+            for k, x in enumerate(diff):
+                if x.isnumeric():
+                    errors[int(x)] = diff[k + 1]
+            diff = '\n'.join(re.findall(r'^(?:\+|-).+', errors[line + 1].strip(), re.M))
+            n = re.findall(r'^-(.+)', errors[line + 1].strip(), re.M)
+            c = re.findall(r'^-(\s+)', errors[line + 1].strip(), re.M)
+            if c:
+                col = len(c[0])
+            if n:
+                near = n[0][:len(n[0]) - col] if col else n[0]
+        message = '{0}\n{1}'.format(j['files'][0]['appliedFixers'], diff)
+        line += 3
 
         return match, line, col, error, warning, message, near
 
@@ -88,6 +99,7 @@ class PhpCsFixer(Linter):
         command.append('--show-progress=none')
         command.append('--stop-on-violation')
         command.append('--diff')
+        command.append('--format=json')
         command.append('--using-cache=no')
         command.append('--no-ansi')
         command.append('-vv')
