@@ -52,7 +52,7 @@ class PhpCsFixer(Linter):
     defaults = {
         'selector': 'embedding.php, source.php  - text.blade'
     }
-    regex = r'@@.+?-(?P<line>\d+)'
+    regex = r'@@.+?-(?P<line>\d+).+?@@'
     multiline = True
     tempfile_suffix = 'php'
     error_stream = util.STREAM_STDOUT
