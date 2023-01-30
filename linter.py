@@ -56,6 +56,7 @@ class PhpCsFixer(Linter):
     multiline = True
     tempfile_suffix = 'php'
     error_stream = util.STREAM_STDOUT
+    line_col_base = (0, 0)
 
     def split_match(self, match):
         """Extract and return values from match."""
@@ -67,15 +68,21 @@ class PhpCsFixer(Linter):
             for k, x in enumerate(diff):
                 if x.isnumeric():
                     errors[int(x)] = diff[k + 1]
-            diff = '\n'.join(re.findall(r'^(?:\+|-).+', errors[line + 1].strip(), re.M))
-            n = re.findall(r'^-(.+)', errors[line + 1].strip(), re.M)
-            c = re.findall(r'^-(\s+)', errors[line + 1].strip(), re.M)
+            diff = '\n'.join(re.findall(r'^(?:\+|-).+', errors[line], re.M))
+            t = re.findall(r'\n.?', errors[line].strip(), re.M)
+            delta = 0
+            for k, i in enumerate(t):
+                if re.match(r'^\n-', i):
+                    delta = k
+                    break
+            n = re.findall(r'^-(.+)', errors[line].strip(), re.M)
+            c = re.findall(r'^-(\s+)', errors[line].strip(), re.M)
             if c:
                 col = len(c[0])
             if n:
                 near = n[0][:len(n[0]) - col] if col else n[0]
         message = '{0}\n{1}'.format(j['files'][0]['appliedFixers'], diff)
-        line += 3
+        line += delta
 
         return match, line, col, error, warning, message, near
 
